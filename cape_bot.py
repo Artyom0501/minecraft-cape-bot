@@ -18,6 +18,12 @@ def check_new_capes():
     global known_capes
     print("🔍 Проверка на новые плащи...")
     try:
+        # Тестовый вывод
+        bot.send_message(CHAT_ID, "✅ Проверка работает!")
+    except Exception as e:
+        print("Ошибка:", e)
+        
+    try:
         response = requests.get('https://laby.net/capes')
         data = response.json()
 
