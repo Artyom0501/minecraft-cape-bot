@@ -18,7 +18,7 @@ def check_new_capes():
     global known_capes
     print("🔍 Проверка на новые плащи...")
     try:
-        response = requests.get('https://capes.dev/api/capes')
+        response = requests.get('https://laby.net/capes')
         data = response.json()
 
         new_found = False
