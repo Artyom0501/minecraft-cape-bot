@@ -17,6 +17,7 @@ known_capes = set()
 # === ФУНКЦИЯ ДЛЯ ПРОВЕРКИ ПЛАЩЕЙ ===
 def check_new_capes():
     global known_capes
+    print("🔍 Проверка на новые плащи...")  # добавь это
     try:
         response = requests.get('https://capes.dev/api/capes')
         data = response.json()
