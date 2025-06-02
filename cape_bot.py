@@ -6,18 +6,17 @@ import threading
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# === Настройки бота ===
-TOKEN = '8093048403:AAHLQNTB_y9DDDORl5WtV8hqgl_cAh-5nnk'  # твой токен
-CHAT_ID = '6399778317'  # твой chat_id
+# === Настройки из переменных окружения ===
+TOKEN = os.environ.get('TELEGRAM_TOKEN')
+CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
 bot = telebot.TeleBot(TOKEN)
+known_capes = set()  # Храним уже известные ID плащей
 
-# Храним последний известный список плащей
-known_capes = set()
-
-# === ФУНКЦИЯ ДЛЯ ПРОВЕРКИ ПЛАЩЕЙ ===
+# === Проверка новых плащей ===
 def check_new_capes():
     global known_capes
-    print("🔍 Проверка на новые плащи...")  # добавь это
+    print("🔍 Проверка на новые плащи...")
     try:
         response = requests.get('https://capes.dev/api/capes')
         data = response.json()
@@ -25,25 +24,24 @@ def check_new_capes():
         new_found = False
         for cape in data:
             if cape['id'] not in known_capes:
-                new_found = True
                 known_capes.add(cape['id'])
+                new_found = True
 
                 name = cape.get('name', 'Без названия')
                 img = cape.get('image', '')
 
                 bot.send_message(CHAT_ID, f"🧥 Обнаружен новый плащ: *{name}*", parse_mode="Markdown")
-
                 if img.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                    bot.send_photo(CHAT_ID, img) 
+                    bot.send_photo(CHAT_ID, img)
                 else:
                     bot.send_message(CHAT_ID, f"⚠️ Картинка не найдена или ссылка неправильная:\n{img}")
-        
+
         if not new_found:
             print("Новых плащей нет.")
     except Exception as e:
         print("Ошибка при проверке новых плащей:", e)
 
-# === РАСПИСАНИЕ ПРОВЕРОК: КАЖДУЮ МИНУТУ ===
+# === Расписание: проверка каждую минуту ===
 schedule.every(1).minutes.do(check_new_capes)
 
 def run_schedule():
@@ -51,18 +49,24 @@ def run_schedule():
         schedule.run_pending()
         time.sleep(1)
 
-# === ОБРАБОТЧИК КОМАНД БОТА ===
+# === Обработка команд бота ===
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
+    if str(message.chat.id) != CHAT_ID:
+        return  # Игнорируем сообщения от чужих
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
 
 @bot.message_handler(commands=['cape'])
 def send_cape(message):
+    if str(message.chat.id) != CHAT_ID:
+        return
     bot.send_message(message.chat.id, "🧥 *Vanilla Cape*\n\nЭтот плащ выдавался игрокам, у которых были и Java, и Bedrock версии Minecraft до 6 июня 2022 года.", parse_mode="Markdown")
     bot.send_photo(message.chat.id, 'https://static.wikia.nocookie.net/minecraft_gamepedia/images/7/77/Vanilla_Cape.png')
 
 @bot.message_handler(commands=['test_cape'])
 def test_cape(message):
+    if str(message.chat.id) != CHAT_ID:
+        return
     name = "Vanilla Cape"
     img = "https://ru.minecraft.wiki/images/Vanilla_cape.png?1d440"
     bot.send_message(message.chat.id, f"🧥 {name}")
@@ -70,9 +74,11 @@ def test_cape(message):
 
 @bot.message_handler(commands=['ping'])
 def ping_command(message):
+    if str(message.chat.id) != CHAT_ID:
+        return
     bot.send_message(message.chat.id, "🏓 Pong!")
 
-# === ПРОСТОЙ HTTP-СЕРВЕР ДЛЯ Render ===
+# === Простой HTTP-сервер для Render ===
 PORT = int(os.environ.get("PORT", 8000))
 
 class SimpleHandler(BaseHTTPRequestHandler):
@@ -83,12 +89,11 @@ class SimpleHandler(BaseHTTPRequestHandler):
 
 def run_server():
     server = HTTPServer(('0.0.0.0', PORT), SimpleHandler)
-    print(f"Starting HTTP server on port {PORT}")
+    print(f"Запущен HTTP-сервер на порту {PORT}")
     server.serve_forever()
 
-# Запускаем веб-сервер и планировщик в отдельных потоках
+# === Запуск ===
 threading.Thread(target=run_server, daemon=True).start()
 threading.Thread(target=run_schedule, daemon=True).start()
 
-# Запускаем бота (блокирующая функция)
 bot.polling()
