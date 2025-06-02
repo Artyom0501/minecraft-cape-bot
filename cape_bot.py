@@ -14,7 +14,7 @@ bot = telebot.TeleBot(TOKEN)
 # Храним последний известный список плащей
 known_capes = set()
 
-# === ТВОЯ ФУНКЦИЯ ДЛЯ ПРОВЕРКИ ПЛАЩЕЙ ===
+# === ФУНКЦИЯ ДЛЯ ПРОВЕРКИ ПЛАЩЕЙ ===
 def check_new_capes():
     global known_capes
     try:
@@ -42,8 +42,8 @@ def check_new_capes():
     except Exception as e:
         print("Ошибка при проверке новых плащей:", e)
 
-# === РАСПИСАНИЕ ПРОВЕРОК ===
-schedule.every(1).day.do(check_new_capes)
+# === РАСПИСАНИЕ ПРОВЕРОК: КАЖДУЮ МИНУТУ ===
+schedule.every(1).minutes.do(check_new_capes)
 
 def run_schedule():
     while True:
@@ -85,10 +85,8 @@ def run_server():
     print(f"Starting HTTP server on port {PORT}")
     server.serve_forever()
 
-# Запускаем веб-сервер в отдельном потоке
+# Запускаем веб-сервер и планировщик в отдельных потоках
 threading.Thread(target=run_server, daemon=True).start()
-
-# Запускаем планировщик проверок в отдельном потоке
 threading.Thread(target=run_schedule, daemon=True).start()
 
 # Запускаем бота (блокирующая функция)
