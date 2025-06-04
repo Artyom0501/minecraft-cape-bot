@@ -48,8 +48,8 @@ def check_new_capes():
         print("Ошибка при проверке новых плащей:", e)
 
 # === Расписание: проверок ===
-schedule.every(1).hours.do(check_new_capes)
-# schedule.every(1).minutes.do(check_new_capes)
+# schedule.every(1).hours.do(check_new_capes)
+schedule.every(1).minutes.do(check_new_capes)
 
 def run_schedule():
     while True:
