@@ -5,51 +5,51 @@ import time
 import threading
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from bs4 import BeautifulSoup
 
 # === Настройки из переменных окружения ===
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 bot = telebot.TeleBot(TOKEN)
-known_capes = set()  # Храним уже известные ID плащей
+known_capes = set()  # Храним уже известные ссылки
 
-# === Проверка новых плащей ===
+# === Проверка новых плащей на Minecraft.net ===
 def check_new_capes():
     global known_capes
-    print("🔍 Проверка на новые плащи...")
-    try:
-        # Тестовый вывод
-        bot.send_message(CHAT_ID, "✅ Проверка работает!")
-    except Exception as e:
-        print("Ошибка:", e)
-        
-    try:
-        response = requests.get('https://laby.net/capes')
-        data = response.json()
+    print("🔍 Проверка сайта Minecraft.net...")
 
+    try:
+        url = 'https://www.minecraft.net/ru-ru'
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        articles = soup.find_all('a', class_='card')
         new_found = False
-        for cape in data:
-            if cape['id'] not in known_capes:
-                known_capes.add(cape['id'])
-                new_found = True
 
-                name = cape.get('name', 'Без названия')
-                img = cape.get('image', '')
+        for article in articles:
+            title = article.get_text(strip=True)
+            href = article.get('href')
+            link = 'https://www.minecraft.net' + href if href.startswith('/') else href
 
-                bot.send_message(CHAT_ID, f"🧥 Обнаружен новый плащ: *{name}*", parse_mode="Markdown")
-                if img.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                    bot.send_photo(CHAT_ID, img)
-                else:
-                    bot.send_message(CHAT_ID, f"⚠️ Картинка не найдена или ссылка неправильная:\n{img}")
+            if any(word in title.lower() for word in ['плащ', 'cape', 'скин', 'подарок']):
+                if link not in known_capes:
+                    known_capes.add(link)
+                    new_found = True
+
+                    bot.send_message(
+                        CHAT_ID,
+                        f"🧥 Обнаружена новая статья:\n*{title}*\n{link}",
+                        parse_mode="Markdown"
+                    )
 
         if not new_found:
-            print("Новых плащей нет.")
+            print("Новых плащей не найдено.")
     except Exception as e:
-        print("Ошибка при проверке новых плащей:", e)
+        print("❌ Ошибка при проверке:", e)
 
-# === Расписание: проверок ===
-# schedule.every(1).hours.do(check_new_capes)
-schedule.every(1).minutes.do(check_new_capes)
+# === Расписание: проверка каждые 30 минут ===
+schedule.every(30).minutes.do(check_new_capes)
 
 def run_schedule():
     while True:
@@ -60,24 +60,8 @@ def run_schedule():
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
     if str(message.chat.id) != CHAT_ID:
-        return  # Игнорируем сообщения от чужих
+        return
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
-
-@bot.message_handler(commands=['cape'])
-def send_cape(message):
-    if str(message.chat.id) != CHAT_ID:
-        return
-    bot.send_message(message.chat.id, "🧥 *Vanilla Cape*\n\nЭтот плащ выдавался игрокам, у которых были и Java, и Bedrock версии Minecraft до 6 июня 2022 года.", parse_mode="Markdown")
-    bot.send_photo(message.chat.id, 'https://static.wikia.nocookie.net/minecraft_gamepedia/images/7/77/Vanilla_Cape.png')
-
-@bot.message_handler(commands=['test_cape'])
-def test_cape(message):
-    if str(message.chat.id) != CHAT_ID:
-        return
-    name = "Vanilla Cape"
-    img = "https://ru.minecraft.wiki/images/Vanilla_cape.png?1d440"
-    bot.send_message(message.chat.id, f"🧥 {name}")
-    bot.send_photo(message.chat.id, img)
 
 @bot.message_handler(commands=['ping'])
 def ping_command(message):
@@ -96,7 +80,7 @@ class SimpleHandler(BaseHTTPRequestHandler):
 
 def run_server():
     server = HTTPServer(('0.0.0.0', PORT), SimpleHandler)
-    print(f"Запущен HTTP-сервер на порту {PORT}")
+    print(f"🌐 HTTP-сервер запущен на порту {PORT}")
     server.serve_forever()
 
 # === Запуск ===
