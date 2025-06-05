@@ -19,7 +19,7 @@ bot = telebot.TeleBot(TOKEN)
 known_capes = set()  # Храним уже известные ссылки
 
 # === Проверка новых плащей на Minecraft.net ===
-def check_new_capes():
+def check_new_capes(triggered_by_command=False, trigger_user_id=None):
     global known_capes
     print("🔍 Проверка сайта Minecraft.net...")
 
@@ -43,15 +43,27 @@ def check_new_capes():
 
                     for user_id in allowed_users:
                         bot.send_message(
-                            user_id,
+                            int(user_id),
                             f"🧥 Обнаружена новая статья:\n*{title}*\n{link}",
                             parse_mode="Markdown"
                         )
 
+        # Уведомления
         if not new_found:
-            print("Новых плащей не найдено.")
+            for user_id in allowed_users:
+                if triggered_by_command:
+                    if str(user_id) == str(trigger_user_id):
+                        bot.send_message(int(user_id), "🔍 Проверка выполнена.\nНовых плащей не найдено.")
+                else:
+                    bot.send_message(int(user_id), "🔍 Проверка сайта Minecraft.net...\nНовых плащей не найдено.")
+        else:
+            print("✅ Новые статьи отправлены.")
     except Exception as e:
         print("❌ Ошибка при проверке:", e)
+        for user_id in allowed_users:
+            if triggered_by_command and str(user_id) != str(trigger_user_id):
+                continue
+            bot.send_message(int(user_id), f"❌ Ошибка при проверке сайта: {e}")
 
 # === Расписание: проверка каждые 30 минут ===
 schedule.every(30).minutes.do(check_new_capes)
@@ -65,14 +77,13 @@ def run_schedule():
 def is_allowed(user_id):
     return str(user_id) in allowed_users
 
-# === Обработка команд бота ===
+# === Команды бота ===
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
     if not is_allowed(message.chat.id):
         bot.reply_to(message, "⛔️ У вас нет доступа к этому боту.")
         print(f"👤 Запрос от неразрешённого пользователя: {message.chat.id}")
         return
-
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
 
 @bot.message_handler(commands=['ping'])
@@ -80,6 +91,15 @@ def ping_command(message):
     if not is_allowed(message.chat.id):
         return
     bot.send_message(message.chat.id, "🏓 Pong!")
+
+@bot.message_handler(commands=['check'])
+def manual_check(message):
+    if not is_allowed(message.chat.id):
+        bot.reply_to(message, "⛔️ У вас нет доступа к этой команде.")
+        print(f"⛔️ Попытка запуска /check от: {message.chat.id}")
+        return
+    bot.send_message(message.chat.id, "🔍 Выполняю ручную проверку сайта Minecraft.net...")
+    threading.Thread(target=check_new_capes, kwargs={"triggered_by_command": True, "trigger_user_id": message.chat.id}).start()
 
 # === Логгирование всех чатов (чтобы находить новых пользователей) ===
 @bot.message_handler(func=lambda message: True)
