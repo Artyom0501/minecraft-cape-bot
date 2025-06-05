@@ -30,6 +30,7 @@ def check_new_capes(triggered_by_command=False, trigger_user_id=None):
 
         articles = soup.find_all('a', class_='card')
         new_found = False
+        found_articles = []
 
         for article in articles:
             title = article.get_text(strip=True)
@@ -37,10 +38,10 @@ def check_new_capes(triggered_by_command=False, trigger_user_id=None):
             link = 'https://www.minecraft.net' + href if href.startswith('/') else href
 
             if any(word in title.lower() for word in ['плащ', 'cape', 'скин', 'подарок']):
+                found_articles.append((title, link))
                 if link not in known_capes:
                     known_capes.add(link)
                     new_found = True
-
                     for user_id in allowed_users:
                         bot.send_message(
                             int(user_id),
@@ -48,22 +49,24 @@ def check_new_capes(triggered_by_command=False, trigger_user_id=None):
                             parse_mode="Markdown"
                         )
 
-        # Уведомления
-        if not new_found:
+        # Если вызвано вручную — сообщаем даже о старых
+        if triggered_by_command and trigger_user_id:
+            if found_articles:
+                bot.send_message(trigger_user_id, f"🔍 Найдено {len(found_articles)} подходящих статей:")
+                for title, link in found_articles:
+                    bot.send_message(trigger_user_id, f"*{title}*\n{link}", parse_mode="Markdown")
+            else:
+                bot.send_message(trigger_user_id, "🔍 Статей с плащами, скинами или подарками не найдено.")
+        elif not new_found:
             for user_id in allowed_users:
-                if triggered_by_command:
-                    if str(user_id) == str(trigger_user_id):
-                        bot.send_message(int(user_id), "🔍 Проверка выполнена.\nНовых плащей не найдено.")
-                else:
-                    bot.send_message(int(user_id), "🔍 Проверка сайта Minecraft.net...\nНовых плащей не найдено.")
-        else:
-            print("✅ Новые статьи отправлены.")
+                bot.send_message(int(user_id), "🔍 Проверка сайта Minecraft.net...\nНовых плащей не найдено.")
+
+        print("✅ Проверка завершена.")
+
     except Exception as e:
         print("❌ Ошибка при проверке:", e)
-        for user_id in allowed_users:
-            if triggered_by_command and str(user_id) != str(trigger_user_id):
-                continue
-            bot.send_message(int(user_id), f"❌ Ошибка при проверке сайта: {e}")
+        if triggered_by_command and trigger_user_id:
+            bot.send_message(trigger_user_id, f"❌ Ошибка при проверке сайта: {e}")
 
 # === Расписание: проверка каждые 30 минут ===
 schedule.every(30).minutes.do(check_new_capes)
@@ -77,13 +80,14 @@ def run_schedule():
 def is_allowed(user_id):
     return str(user_id) in allowed_users
 
-# === Команды бота ===
+# === Обработка команд бота ===
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
     if not is_allowed(message.chat.id):
         bot.reply_to(message, "⛔️ У вас нет доступа к этому боту.")
         print(f"👤 Запрос от неразрешённого пользователя: {message.chat.id}")
         return
+
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
 
 @bot.message_handler(commands=['ping'])
@@ -99,7 +103,11 @@ def manual_check(message):
         print(f"⛔️ Попытка запуска /check от: {message.chat.id}")
         return
     bot.send_message(message.chat.id, "🔍 Выполняю ручную проверку сайта Minecraft.net...")
-    threading.Thread(target=check_new_capes, kwargs={"triggered_by_command": True, "trigger_user_id": message.chat.id}).start()
+    threading.Thread(
+        target=check_new_capes,
+        kwargs={"triggered_by_command": True, "trigger_user_id": message.chat.id},
+        daemon=True
+    ).start()
 
 # === Логгирование всех чатов (чтобы находить новых пользователей) ===
 @bot.message_handler(func=lambda message: True)
