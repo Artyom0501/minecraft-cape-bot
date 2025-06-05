@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 # === Настройки из переменных окружения ===
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+ALLOWED_USERS = os.environ.get('ALLOWED_USERS', '').split(',')
 
 bot = telebot.TeleBot(TOKEN)
 known_capes = set()  # Храним уже известные ссылки
@@ -37,11 +37,12 @@ def check_new_capes():
                     known_capes.add(link)
                     new_found = True
 
-                    bot.send_message(
-                        CHAT_ID,
-                        f"🧥 Обнаружена новая статья:\n*{title}*\n{link}",
-                        parse_mode="Markdown"
-                    )
+                    for user_id in ALLOWED_USERS:
+                        bot.send_message(
+                            user_id,
+                            f"🧥 Обнаружена новая статья:\n*{title}*\n{link}",
+                            parse_mode="Markdown"
+                        )
 
         if not new_found:
             print("Новых плащей не найдено.")
@@ -59,13 +60,13 @@ def run_schedule():
 # === Обработка команд бота ===
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
-    if str(message.chat.id) != CHAT_ID:
+    if str(message.chat.id) not in ALLOWED_USERS:
         return
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
 
 @bot.message_handler(commands=['ping'])
 def ping_command(message):
-    if str(message.chat.id) != CHAT_ID:
+    if str(message.chat.id) not in ALLOWED_USERS:
         return
     bot.send_message(message.chat.id, "🏓 Pong!")
 
@@ -82,6 +83,11 @@ def run_server():
     server = HTTPServer(('0.0.0.0', PORT), SimpleHandler)
     print(f"🌐 HTTP-сервер запущен на порту {PORT}")
     server.serve_forever()
+
+# сообщение ID друга
+@bot.message_handler(func=lambda message: True)
+def any_message(message):
+    print(f"👤 Новый пользователь: {message.chat.id}")
 
 # === Запуск ===
 threading.Thread(target=run_server, daemon=True).start()
