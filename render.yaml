@@ -10,3 +10,5 @@ services:
         fromEnv: TELEGRAM_TOKEN
       - key: TELEGRAM_CHAT_ID
         fromEnv: TELEGRAM_CHAT_ID
+      - key: ALLOWED_USERS
+        fromEnv: ALLOWED_USERS
