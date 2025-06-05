@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: minecraft-cape-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python cape_bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        fromEnv: TELEGRAM_TOKEN
+      - key: TELEGRAM_CHAT_ID
+        fromEnv: TELEGRAM_CHAT_ID
