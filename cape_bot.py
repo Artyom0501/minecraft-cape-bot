@@ -84,11 +84,6 @@ def run_server():
     print(f"🌐 HTTP-сервер запущен на порту {PORT}")
     server.serve_forever()
 
-# сообщение ID друга
-@bot.message_handler(func=lambda message: True)
-def any_message(message):
-    print(f"👤 Новый пользователь: {message.chat.id}")
-
 # === Запуск ===
 threading.Thread(target=run_server, daemon=True).start()
 threading.Thread(target=run_schedule, daemon=True).start()
