@@ -9,7 +9,11 @@ from bs4 import BeautifulSoup
 
 # === Настройки из переменных окружения ===
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
-ALLOWED_USERS = os.environ.get('ALLOWED_USERS', '').split(',')
+ALLOWED_USERS = os.environ.get('ALLOWED_USERS', '')
+PORT = int(os.environ.get("PORT", 8000))
+
+# Обрабатываем список разрешённых ID
+allowed_users = [uid.strip() for uid in ALLOWED_USERS.split(',') if uid.strip().isdigit()]
 
 bot = telebot.TeleBot(TOKEN)
 known_capes = set()  # Храним уже известные ссылки
@@ -37,7 +41,7 @@ def check_new_capes():
                     known_capes.add(link)
                     new_found = True
 
-                    for user_id in ALLOWED_USERS:
+                    for user_id in allowed_users:
                         bot.send_message(
                             user_id,
                             f"🧥 Обнаружена новая статья:\n*{title}*\n{link}",
@@ -57,22 +61,32 @@ def run_schedule():
         schedule.run_pending()
         time.sleep(1)
 
+# === Проверка доступа пользователя ===
+def is_allowed(user_id):
+    return str(user_id) in allowed_users
+
 # === Обработка команд бота ===
 @bot.message_handler(commands=['start', 'плащ'])
 def send_welcome(message):
-    if str(message.chat.id) not in ALLOWED_USERS:
+    if not is_allowed(message.chat.id):
+        bot.reply_to(message, "⛔️ У вас нет доступа к этому боту.")
+        print(f"👤 Запрос от неразрешённого пользователя: {message.chat.id}")
         return
+
     bot.reply_to(message, "Привет! Бот будет присылать тебе новые плащи, как только они появятся!")
 
 @bot.message_handler(commands=['ping'])
 def ping_command(message):
-    if str(message.chat.id) not in ALLOWED_USERS:
+    if not is_allowed(message.chat.id):
         return
     bot.send_message(message.chat.id, "🏓 Pong!")
 
-# === Простой HTTP-сервер для Render ===
-PORT = int(os.environ.get("PORT", 8000))
+# === Логгирование всех чатов (чтобы находить новых пользователей) ===
+@bot.message_handler(func=lambda message: True)
+def any_message(message):
+    print(f"👤 Новый пользователь: {message.chat.id} написал: {message.text}")
 
+# === Простой HTTP-сервер для Render ===
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
